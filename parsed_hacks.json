@@ -1,0 +1,376 @@
+[
+  {
+    "name": "Bait",
+    "category": "Covert",
+    "availableTiers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "1": 2,
+      "2": 3,
+      "4": 4,
+      "Iconic": 3
+    },
+    "uploadTime": {
+      "1": 0.3
+    },
+    "rawUploadTime": "{{R|TI|0.3}}",
+    "rawRam": "{{R|TI|2}} → {{R|TII|3}}  → {{R|TIV|4}}→ {{R|I|3}}"
+  },
+  {
+    "name": "Blackwall Gateway",
+    "category": "Ultimate",
+    "availableTiers": [
+      "Iconic"
+    ],
+    "ramCost": {
+      "3": 14
+    },
+    "uploadTime": {
+      "3": 9
+    },
+    "rawUploadTime": "{{R|TIII|9}}",
+    "rawRam": "{{R|TIII|14}}"
+  },
+  {
+    "name": "Contagion",
+    "category": "Combat",
+    "availableTiers": [
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "2": 5,
+      "3": 6,
+      "4": 9,
+      "5": 12
+    },
+    "uploadTime": {
+      "2": 3,
+      "4": 2
+    },
+    "rawUploadTime": "{{R|TII|3}} → {{R|TIV|2}}",
+    "rawRam": "{{R|TII|5}} → {{R|TIII|6}} → {{R|TIV|9}} → {{R|TV|12}}"
+  },
+  {
+    "name": "Cripple Movement",
+    "category": "Control",
+    "availableTiers": [
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "2": 3,
+      "3": 4,
+      "4": 6
+    },
+    "uploadTime": {
+      "2": 0.3
+    },
+    "rawUploadTime": "{{R|TII|0.3}}",
+    "rawRam": "{{R|TII|3}} →{{R|TIII|4}} → {{R|TIV|6}}"
+  },
+  {
+    "name": "Cyberpsychosis",
+    "category": "Ultimate",
+    "availableTiers": [
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "4": 22
+    },
+    "uploadTime": {
+      "4": 1.5
+    },
+    "rawUploadTime": "{{R|TIV|1.5}}",
+    "rawRam": "{{R|TIV|22}}"
+  },
+  {
+    "name": "Cyberware Malfunction",
+    "category": "Control",
+    "availableTiers": [
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "2": 3,
+      "3": 4
+    },
+    "uploadTime": {
+      "2": 0.3
+    },
+    "rawUploadTime": "{{R|TII|0.3}}",
+    "rawRam": "{{R|TII|3}} → {{R|TIII|4}}"
+  },
+  {
+    "name": "Detonate Grenade",
+    "category": "Ultimate",
+    "availableTiers": [
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "4": 24
+    },
+    "uploadTime": {
+      "4": 1
+    },
+    "rawUploadTime": "{{R|TIV|1.0}}",
+    "rawRam": "{{R|TIV|24}}"
+  },
+  {
+    "name": "Memory Wipe",
+    "category": "Covert",
+    "availableTiers": [
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "3": 8,
+      "4": 10,
+      "5": 32
+    },
+    "uploadTime": {
+      "3": 1.5,
+      "5": 10,
+      "Iconic": 3
+    },
+    "rawUploadTime": "{{R|TIII|1.5}} → {{R|TV|10}} → {{R|I|3}}",
+    "rawRam": "{{R|TIII|8}} → {{R|TIV|10}} → {{R|TV|32}}"
+  },
+  {
+    "name": "Overheat",
+    "category": "Combat",
+    "availableTiers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "1": 3,
+      "2": 4,
+      "3": 6,
+      "4": 7,
+      "5": 9
+    },
+    "uploadTime": {
+      "1": 2
+    },
+    "rawUploadTime": "{{R|TI|2}}",
+    "rawRam": "{{R|TI|3}} → {{R|TII|4}} → {{R|TIII|6}} → {{R|TIV|7}} →{{R|TV|9}}"
+  },
+  {
+    "name": "Ping",
+    "category": "Covert",
+    "availableTiers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "1": 4,
+      "3": 5,
+      "5": 7,
+      "Iconic": 4
+    },
+    "uploadTime": {
+      "1": 1
+    },
+    "rawUploadTime": "{{R|TI|1}}",
+    "rawRam": "{{R|TI|4}} → {{R|TIII|5}} → {{R|TV|7}} → {{R|I|4}}"
+  },
+  {
+    "name": "Reboot Optics",
+    "category": "Control",
+    "availableTiers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "1": 2,
+      "3": 5,
+      "4": 7
+    },
+    "uploadTime": {
+      "1": 0.3
+    },
+    "rawUploadTime": "{{R|TI|0.3}}",
+    "rawRam": "{{R|TI|2}} → {{R|TIII|5}} → {{R|TIV|7}}"
+  },
+  {
+    "name": "Request Backup",
+    "category": "Covert",
+    "availableTiers": [
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "2": 3,
+      "4": 4,
+      "5": 6,
+      "Iconic": 3
+    },
+    "uploadTime": {
+      "2": 2
+    },
+    "rawUploadTime": "{{R|TII|2}}",
+    "rawRam": "{{R|TII|3}} → {{R|TIV|4}} → {{R|TV|6}} → {{R|I|3}}"
+  },
+  {
+    "name": "Short Circuit",
+    "category": "Combat",
+    "availableTiers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "1": 3,
+      "2": 4,
+      "3": 5,
+      "4": 7,
+      "5": 10
+    },
+    "uploadTime": {
+      "1": 1.5,
+      "3": 1,
+      "5": 0.5
+    },
+    "rawUploadTime": "{{R|TI|1.5}} → {{R|TIII|1}} → {{R|TV|0.5}}",
+    "rawRam": "{{R|TI|3}} →{{R|TII|4}} → {{R|TIII|5}} → {{R|TIV|7}} → {{R|TV|10}}"
+  },
+  {
+    "name": "Sonic Shock",
+    "category": "Covert",
+    "availableTiers": [
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "2": 3,
+      "3": 4,
+      "4": 5,
+      "5": 6,
+      "Iconic": 2
+    },
+    "uploadTime": {
+      "2": 1,
+      "5": 2
+    },
+    "rawUploadTime": "{{R|TII|1.0}} → {{R|TV|2.0}}",
+    "rawRam": "{{R|TII|3}} → {{R|TIII|4}} → {{R|TIV|5}} → {{R|TV|6}} → {{R|I|2}}"
+  },
+  {
+    "name": "Suicide",
+    "category": "Ultimate",
+    "availableTiers": [
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "4": 24
+    },
+    "uploadTime": {
+      "Iconic": 12.5
+    },
+    "rawUploadTime": "{{R|I|12.5}}",
+    "rawRam": "{{R|TIV|24}}"
+  },
+  {
+    "name": "Synapse Burnout",
+    "category": "Combat",
+    "availableTiers": [
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "3": 10,
+      "4": 14,
+      "5": 16
+    },
+    "uploadTime": {
+      "3": 3
+    },
+    "rawUploadTime": "{{R|TIII|3.0}}",
+    "rawRam": "{{R|TIII|10}} → {{R|TIV|14}} → {{R|TV|16}}"
+  },
+  {
+    "name": "System Collapse",
+    "category": "Ultimate",
+    "availableTiers": [
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "4": 28
+    },
+    "uploadTime": {
+      "4": 1
+    },
+    "rawUploadTime": "{{R|TIV|1.0}}",
+    "rawRam": "{{R|TIV|28}}"
+  },
+  {
+    "name": "Weapon Glitch",
+    "category": "Control",
+    "availableTiers": [
+      2,
+      3,
+      4,
+      5,
+      "Iconic"
+    ],
+    "ramCost": {
+      "2": 3,
+      "3": 4,
+      "4": 6
+    },
+    "uploadTime": {
+      "2": 0.3
+    },
+    "rawUploadTime": "{{R|TII|0.3}}",
+    "rawRam": "{{R|TII|3}} → {{R|TIII|4}} → {{R|TIV|6}}"
+  }
+]

@@ -1,6 +1,7 @@
 import React from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { HackQueue, PerkState, Quickhack, QueueItem } from '../types';
+import type { HackQueue, PerkState, Quickhack, QueueItem, InputState } from '../types';
+import { CYBERDECKS } from '../data/cyberdecks';
 
 interface QueueSystemProps {
   queues: HackQueue[];
@@ -11,9 +12,10 @@ interface QueueSystemProps {
   currentRAM: number;
   setCurrentRAM: React.Dispatch<React.SetStateAction<number>>;
   perks: PerkState;
+  inputs: InputState;
 }
 
-export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId, cyberdeck, currentRAM, setCurrentRAM, perks }: QueueSystemProps) {
+export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId, cyberdeck, currentRAM, setCurrentRAM, perks, inputs }: QueueSystemProps) {
 
   const addQueue = () => {
     const newQueue: HackQueue = { id: uuidv4(), items: [], locked: false };
@@ -22,10 +24,18 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
   };
 
   const calculateCost = (hack: Quickhack, isFourthSlot: boolean) => {
-    if (isFourthSlot && perks.queueMastery) {
-      return Math.max(1, Math.floor(hack.baseCost / 2));
+    let cost = hack.baseCost;
+
+    // Apply Cyberdeck modifiers
+    const activeDeck = CYBERDECKS.find(d => d.id === inputs.selectedCyberdeckId);
+    if (activeDeck && activeDeck.bonus.covertRamDiscount && hack.category === 'Covert') {
+        cost = Math.max(1, cost - activeDeck.bonus.covertRamDiscount);
     }
-    return hack.baseCost;
+
+    if (isFourthSlot && perks.queueMastery) {
+      return Math.max(1, Math.floor(cost / 2));
+    }
+    return cost;
   };
 
   const handleAddHackToQueue = (hack: Quickhack) => {
@@ -53,10 +63,17 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
 
     setCurrentRAM(prev => prev - cost);
 
+
+    let uploadTime = hack.uploadTime;
+    const activeDeck = CYBERDECKS.find(d => d.id === inputs.selectedCyberdeckId);
+    if (activeDeck && activeDeck.bonus.combatUploadReduction && hack.category === 'Combat') {
+        uploadTime = uploadTime * (1 - activeDeck.bonus.combatUploadReduction);
+    }
+
     const newItem: QueueItem = {
       id: uuidv4(),
       quickhack: hack,
-      remainingUploadTime: hack.uploadTime,
+      remainingUploadTime: uploadTime,
       cost,
       completed: false,
     };

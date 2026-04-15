@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { InputState, PerkState, HackQueue, Quickhack } from './types';
+import { CYBERDECKS } from './data/cyberdecks';
 import { Cyberdeck } from './components/Cyberdeck';
 import { QueueSystem } from './components/QueueSystem';
 import './index.css';
@@ -11,6 +12,7 @@ function App() {
     regenRate: 1.0,
     ramOnKill: 2,
     uploadReduction: 0,
+    selectedCyberdeckId: 'none',
   });
 
   const [perks, setPerks] = useState<PerkState>({
@@ -18,6 +20,8 @@ function App() {
     dataRecycler: false,
     speculation: false,
     queueMastery: false,
+    queueAcceleration: false,
+    queuePrioritization: false,
   });
 
   const [currentRAM, setCurrentRAM] = useState<number>(20);
@@ -44,10 +48,11 @@ function App() {
         if (prevQueues.length === 0) return prevQueues;
 
         const uploadSpeedMultiplier = 1 + (inputs.uploadReduction / 100);
-        const timeToSubtract = (tickRateMs / 1000) * uploadSpeedMultiplier;
+
 
         let queuesChanged = false;
         let ramToRefund = 0;
+
 
         const nextQueues = prevQueues.map(queue => {
           if (queue.items.length === 0) return queue;
@@ -62,8 +67,19 @@ function App() {
             return null;
           }
 
+          let currentUploadSpeedMultiplier = uploadSpeedMultiplier;
+          if (perks.queuePrioritization && activeItemIndex === 0 && queue.items.length >= 2) {
+              currentUploadSpeedMultiplier += 0.5; // +50% speed for 1st if at least 2 queued
+          }
+          if (perks.queueAcceleration && activeItemIndex >= 2) {
+              currentUploadSpeedMultiplier += 0.6; // +60% speed for 3rd or later
+          }
+
+          const localTimeToSubtract = (tickRateMs / 1000) * currentUploadSpeedMultiplier;
+
           const item = newItems[activeItemIndex];
-          const newRemainingTime = Math.max(0, item.remainingUploadTime - timeToSubtract);
+          const newRemainingTime = Math.max(0, item.remainingUploadTime - localTimeToSubtract);
+
 
           if (newRemainingTime !== item.remainingUploadTime) {
             queuesChanged = true;
@@ -159,6 +175,18 @@ function App() {
         <div className="flex flex-col gap-4 border border-sky-800 p-4 rounded bg-slate-900">
           <h2 className="text-xl font-bold text-sky-400">Settings</h2>
 
+                    <label className="flex justify-between items-center">
+            <span>Cyberdeck:</span>
+            <select className="w-48 bg-slate-800 border border-sky-700 text-sky-300 p-1"
+                    value={inputs.selectedCyberdeckId}
+                    onChange={e => {
+                        const val = e.target.value;
+                        const deck = CYBERDECKS.find(d => d.id === val);
+                        setInputs({...inputs, selectedCyberdeckId: val, maxRam: deck ? deck.maxRam : inputs.maxRam})
+                    }}>
+              {CYBERDECKS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
           <label className="flex justify-between items-center">
             <span>Max RAM:</span>
             <input type="number" className="w-20 bg-slate-800 border border-sky-700 text-sky-300 p-1" value={inputs.maxRam} onChange={e => setInputs({...inputs, maxRam: Number(e.target.value)})} />
@@ -193,6 +221,16 @@ function App() {
             <input type="checkbox" checked={perks.queueMastery} onChange={e => setPerks({...perks, queueMastery: e.target.checked})} className="accent-sky-500" />
             Queue Mastery (4th slot half cost)
           </label>
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" className="w-4 h-4 rounded border-sky-800 bg-slate-900 checked:bg-sky-500"
+                checked={perks.queueAcceleration} onChange={e => setPerks({...perks, queueAcceleration: e.target.checked})} />
+              <span className="group-hover:text-sky-300">Queue-Acceleration (+60% speed 3rd+)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" className="w-4 h-4 rounded border-sky-800 bg-slate-900 checked:bg-sky-500"
+                checked={perks.queuePrioritization} onChange={e => setPerks({...perks, queuePrioritization: e.target.checked})} />
+              <span className="group-hover:text-sky-300">Queue Prioritization (+50% speed 1st if 2+ queued)</span>
+            </label>
         </div>
 
         <div className="col-span-2 flex flex-col gap-4 border border-sky-800 p-4 rounded bg-slate-900">
@@ -215,6 +253,7 @@ function App() {
             currentRAM={currentRAM}
             setCurrentRAM={setCurrentRAM}
             perks={perks}
+            inputs={inputs}
           />
         </div>
       </div>

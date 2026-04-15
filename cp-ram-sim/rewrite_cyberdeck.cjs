@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { DndContext, DragOverlay, useDraggable, useDroppable, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core';
-import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
+const fs = require('fs');
+
+const content = `import React, { useState } from 'react';
+import { DndContext, DragOverlay, useDraggable, useDroppable, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { QUICKHACKS } from '../data/quickhacks';
 import type { Quickhack } from '../types';
 
@@ -20,7 +21,7 @@ function DraggableHack({ hack }: { hack: Quickhack }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`bg-slate-800 border ${isDragging ? 'border-sky-300 opacity-50' : 'border-slate-600'} p-2 text-sm rounded cursor-grab hover:border-sky-500 hover:bg-slate-700 transition-colors`}
+      className={\`bg-slate-800 border \${isDragging ? 'border-sky-300 opacity-50' : 'border-slate-600'} p-2 text-sm rounded cursor-grab hover:border-sky-500 hover:bg-slate-700 transition-colors\`}
     >
       <div className="font-bold">{hack.name} <span className="text-xs text-yellow-500 ml-1">T{hack.tier}</span></div>
       <div className="text-xs text-slate-400 flex justify-between mt-1">
@@ -33,17 +34,17 @@ function DraggableHack({ hack }: { hack: Quickhack }) {
 
 function DroppableSlot({ index, slot, removeHack }: { index: number, slot: Quickhack | null, removeHack: (i: number) => void }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: `slot-${index}`,
+    id: \`slot-\${index}\`,
     data: { index }
   });
 
   return (
     <div
       ref={setNodeRef}
-      className={`h-24 rounded border-2 border-dashed flex items-center justify-center relative transition-colors ${
+      className={\`h-24 rounded border-2 border-dashed flex items-center justify-center relative transition-colors \${
         isOver ? 'border-sky-300 bg-slate-700' :
         slot ? 'border-sky-500 bg-slate-800' : 'border-sky-900 bg-slate-900 hover:border-sky-700'
-      }`}
+      }\`}
     >
       {slot ? (
         <div className="flex flex-col items-center p-2 w-full h-full justify-center text-center group cursor-pointer" onClick={() => removeHack(index)}>
@@ -75,20 +76,6 @@ export function Cyberdeck({ cyberdeck, setCyberdeck }: CyberdeckProps) {
     return acc;
   }, {} as Record<string, Quickhack[]>);
 
-    const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 100,
-        tolerance: 5,
-      },
-    })
-  );
-
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     if (active.data.current?.hack) {
@@ -107,19 +94,19 @@ export function Cyberdeck({ cyberdeck, setCyberdeck }: CyberdeckProps) {
       if (hack) {
         const exists = cyberdeck.some((h, i) => i !== index && h && h.name === hack.name);
         if (exists) {
-          alert(`You already have a tier of ${hack.name} equipped.`);
-        } else {
-          const newDeck = [...cyberdeck];
-          newDeck[index] = hack;
-          setCyberdeck(newDeck);
+          alert(\`You already have a tier of \${hack.name} equipped.\`);
+          return;
         }
+        const newDeck = [...cyberdeck];
+        newDeck[index] = hack;
+        setCyberdeck(newDeck);
       }
     }
   };
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex flex-col gap-6 w-full">
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex flex-col gap-6 w-full touch-none">
         <div className="border border-sky-800 p-4 rounded bg-slate-900/50">
           <h2 className="text-xl font-bold text-sky-400 mb-4">Quickhack Library</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
@@ -158,3 +145,7 @@ export function Cyberdeck({ cyberdeck, setCyberdeck }: CyberdeckProps) {
     </DndContext>
   );
 }
+`;
+
+fs.writeFileSync('src/components/Cyberdeck.tsx', content);
+console.log('rewrote Cyberdeck.tsx for dnd-kit');
