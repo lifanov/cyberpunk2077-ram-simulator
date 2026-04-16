@@ -55,4 +55,10 @@ export const CYBERDECKS: CyberdeckDef[] = [
     "maxRam": 13,
     "bonus": {}
   }
+  ,{
+    "id": "canto-mk6",
+    "name": "Militech Canto Mk.6 (Unimplemented)",
+    "maxRam": 10,
+    "bonus": {}
+  }
 ];

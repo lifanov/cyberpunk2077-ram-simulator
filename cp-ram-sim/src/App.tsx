@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { InputState, PerkState, HackQueue, Quickhack } from './types';
+
+import type { InputState, PerkState, HackQueue, Quickhack, QueueItem } from './types';
 import { CYBERDECKS } from './data/cyberdecks';
 import { Cyberdeck } from './components/Cyberdeck';
 import { QueueSystem } from './components/QueueSystem';
@@ -13,6 +13,8 @@ function App() {
     ramOnKill: 2,
     uploadReduction: 0,
     selectedCyberdeckId: 'none',
+    timeSlowdown: 0,
+    autoCreateQueues: false,
   });
 
   const [perks, setPerks] = useState<PerkState>({
@@ -33,13 +35,16 @@ function App() {
   useEffect(() => {
     const tickRateMs = 50; // 50ms per tick
     const interval = setInterval(() => {
+      const timeScalar = 1 - (inputs.timeSlowdown / 100);
+      if (timeScalar <= 0) return; // Completely paused
+
       // 1. Regenerate RAM
       setCurrentRAM(prev => {
         let baseRegen = inputs.regenRate;
         if (perks.optimization) {
           baseRegen += inputs.regenRate * 0.1;
         }
-        const regenAmount = baseRegen * (tickRateMs / 1000);
+        const regenAmount = baseRegen * (tickRateMs / 1000) * timeScalar;
         return Math.min(inputs.maxRam, prev + regenAmount);
       });
 
@@ -48,113 +53,205 @@ function App() {
         if (prevQueues.length === 0) return prevQueues;
 
         const uploadSpeedMultiplier = 1 + (inputs.uploadReduction / 100);
-
-
         let queuesChanged = false;
         let ramToRefund = 0;
+        const networkHacksToApply: QueueItem[] = []; // for ping/memory wipe
+        const contagionSpreadQueue: {item: QueueItem, sourceQueueId: string}[] = [];
 
-
-        const nextQueues = prevQueues.map(queue => {
+        let nextQueues = prevQueues.map(queue => {
           if (queue.items.length === 0) return queue;
 
           const newItems = [...queue.items];
-          // Find the first uncompleted item
-          const activeItemIndex = newItems.findIndex(item => !item.completed);
+          let queueModified = false;
 
-          // Check if queue just finished everything naturally (Drain)
-          if (activeItemIndex === -1) {
-            // Already completely finished, just clear it
-            return null;
-          }
-
-          let currentUploadSpeedMultiplier = uploadSpeedMultiplier;
-          if (perks.queuePrioritization && activeItemIndex === 0 && queue.items.length >= 2) {
-              currentUploadSpeedMultiplier += 0.5; // +50% speed for 1st if at least 2 queued
-          }
-          if (perks.queueAcceleration && activeItemIndex >= 2) {
-              currentUploadSpeedMultiplier += 0.6; // +60% speed for 3rd or later
-          }
-
-          const localTimeToSubtract = (tickRateMs / 1000) * currentUploadSpeedMultiplier;
-
-          const item = newItems[activeItemIndex];
-          const newRemainingTime = Math.max(0, item.remainingUploadTime - localTimeToSubtract);
-
-
-          if (newRemainingTime !== item.remainingUploadTime) {
-            queuesChanged = true;
-            newItems[activeItemIndex] = {
-              ...item,
-              remainingUploadTime: newRemainingTime,
-              completed: newRemainingTime === 0
-            };
-          }
-
-          // Check if the current item just completed right now
-          if (newRemainingTime === 0 && item.remainingUploadTime > 0) {
-            const h = item.quickhack;
-            let triggersKill = false;
-
-            // Kill Condition 1: Ultimate quickhack
-            if (h.category === 'Ultimate') triggersKill = true;
-            // Kill Condition 2: Synapse Burnout
-            if (h.name === 'Synapse Burnout') triggersKill = true;
-            // Kill Condition 3: Short Circuit
-            if (h.name === 'Short Circuit') triggersKill = true;
-
-            // Gather previously completed hacks in this queue
-            const prevHacks = newItems.slice(0, activeItemIndex).map(i => i.quickhack.name);
-
-            // Kill Condition 4: Overheat following Contagion
-            if (h.name === 'Overheat' && prevHacks.includes('Contagion')) triggersKill = true;
-
-            // Kill Condition 5: Sonic Shock following Memory Wipe + Reboot Optics
-            if (h.name === 'Sonic Shock' && prevHacks.includes('Memory Wipe') && prevHacks.includes('Reboot Optics')) triggersKill = true;
-
-            if (triggersKill) {
-              console.log("KILL TRIGGERED by", h.name);
-              // Calculate refunds
-              let refund = inputs.ramOnKill;
-
-              const totalQueueCost = newItems.reduce((sum, it) => sum + it.cost, 0);
-
-              if (perks.speculation) {
-                refund += totalQueueCost * 0.25;
+          // Process active durations first
+          for (let i = 0; i < newItems.length; i++) {
+            if (newItems[i].completed && newItems[i].activeDuration > 0) {
+              const newDuration = Math.max(0, newItems[i].activeDuration - (tickRateMs / 1000) * timeScalar);
+              if (newDuration !== newItems[i].activeDuration) {
+                newItems[i] = { ...newItems[i], activeDuration: newDuration };
+                queueModified = true;
               }
-
-              if (perks.dataRecycler) {
-                const unexecutedCost = newItems.slice(activeItemIndex + 1).reduce((sum, it) => sum + it.cost, 0);
-                refund += unexecutedCost * 0.8;
-              }
-
-              ramToRefund += refund;
-
-              // Destroy queue on kill
-              return null;
             }
           }
 
-          // If it reached the end normally without kill, and we just completed the last one
-          if (activeItemIndex === newItems.length - 1 && newItems[activeItemIndex].completed) {
-            return null; // Drain/Clear
+          // Remove items that have completely expired
+          const itemsBeforeFilter = newItems.length;
+          const filteredItems = newItems.filter(item => !item.completed || item.activeDuration > 0);
+          if (filteredItems.length !== itemsBeforeFilter) queueModified = true;
+
+          const activeItemIndex = filteredItems.findIndex(item => !item.completed);
+
+          if (activeItemIndex !== -1) {
+            // Process upload
+            let currentUploadSpeedMultiplier = uploadSpeedMultiplier;
+            if (perks.queuePrioritization && activeItemIndex === 0 && filteredItems.length >= 2) {
+                currentUploadSpeedMultiplier += 0.5;
+            }
+            if (perks.queueAcceleration && activeItemIndex >= 2) {
+                currentUploadSpeedMultiplier += 0.6;
+            }
+
+            const localTimeToSubtract = (tickRateMs / 1000) * currentUploadSpeedMultiplier * timeScalar;
+            const item = filteredItems[activeItemIndex];
+            const newRemainingTime = Math.max(0, item.remainingUploadTime - localTimeToSubtract);
+
+            if (newRemainingTime !== item.remainingUploadTime) {
+              queueModified = true;
+              filteredItems[activeItemIndex] = {
+                ...item,
+                remainingUploadTime: newRemainingTime,
+                completed: newRemainingTime === 0
+              };
+            }
+
+            // If it just completed
+            if (newRemainingTime === 0 && item.remainingUploadTime > 0) {
+              const h = item.quickhack;
+              let triggersKill = false;
+
+              if (h.category === 'Ultimate' || h.name === 'Synapse Burnout' || h.name === 'Short Circuit') triggersKill = true;
+
+              const prevHacks = filteredItems.slice(0, activeItemIndex).map(i => i.quickhack.name);
+              if (h.name === 'Overheat' && prevHacks.includes('Contagion')) triggersKill = true;
+              if (h.name === 'Sonic Shock' && prevHacks.includes('Memory Wipe') && prevHacks.includes('Reboot Optics')) triggersKill = true;
+
+              if (triggersKill) {
+                console.log("KILL TRIGGERED by", h.name);
+                let refund = inputs.ramOnKill;
+                const totalQueueCost = filteredItems.reduce((sum, it) => sum + it.cost, 0);
+                if (perks.speculation) refund += totalQueueCost * 0.25;
+                if (perks.dataRecycler) {
+                  const unexecutedCost = filteredItems.slice(activeItemIndex + 1).reduce((sum, it) => sum + it.cost, 0);
+                  refund += unexecutedCost * 0.8;
+                }
+                ramToRefund += refund;
+                return null;
+              }
+
+              // Network spreading (Ping, Memory Wipe T5/Iconic)
+              if (h.name === 'Ping' || (h.name === 'Memory Wipe' && (h.tier === 5 || h.tier === 'Iconic'))) {
+                 networkHacksToApply.push({...filteredItems[activeItemIndex]}); // push copy to apply to others
+              }
+
+              // Contagion spread
+              if (h.name === 'Contagion') {
+                contagionSpreadQueue.push({item: {...filteredItems[activeItemIndex]}, sourceQueueId: queue.id});
+              }
+            }
           }
 
-          if (queuesChanged) {
-            return { ...queue, items: newItems };
+          // Lock logic: 4 uncompleted items
+          const uncompletedCount = filteredItems.filter(it => !it.completed).length;
+          const isLocked = uncompletedCount >= 4;
+          if (queue.locked !== isLocked) queueModified = true;
+
+          if (queueModified) {
+            queuesChanged = true;
+            return { ...queue, items: filteredItems, locked: isLocked };
           }
           return queue;
-        }).filter(q => q !== null) as HackQueue[]; // remove nulls
+        }).filter(q => q !== null) as import('./types').HackQueue[];
 
         // Apply any pending refunds
         if (ramToRefund > 0) {
           setCurrentRAM(prev => Math.min(inputs.maxRam, prev + ramToRefund));
         }
 
-        // If no queues remain after processing, instantly create an empty one
-        if (nextQueues.length === 0 && prevQueues.length > 0) {
-           const emptyQueue: HackQueue = { id: uuidv4(), items: [], locked: false };
+        // Apply Network Spreading to all queues
+        if (networkHacksToApply.length > 0) {
+           nextQueues = nextQueues.map(q => {
+              let qModified = false;
+              const newQItems = [...q.items];
+              for (const netHack of networkHacksToApply) {
+                 // Check if already in queue to avoid duplicates maybe? Or just add. The wiki implies it applies effect.
+                 // We add a completed version of the hack to the queue to simulate its effect ticking.
+                 const hasHack = newQItems.some(i => i.quickhack.name === netHack.quickhack.name && i.completed);
+                 if (!hasHack) {
+                    newQItems.push({
+                       ...netHack,
+                       id: crypto.randomUUID(),
+                       remainingUploadTime: 0,
+                       completed: true,
+                       cost: 0 // Free
+                    });
+                    qModified = true;
+                 }
+              }
+              if (qModified) queuesChanged = true;
+              return qModified ? {...q, items: newQItems} : q;
+           });
+        }
+
+        // Apply Contagion Spreading
+        for (const spreadEvent of contagionSpreadQueue) {
+           const sourceHack = spreadEvent.item.quickhack;
+           let spreadLimit = 2;
+           if (sourceHack.tier === 3 || sourceHack.tier === 4 || sourceHack.tier === 5 || sourceHack.tier === 'Iconic') {
+              spreadLimit = 4;
+           }
+
+           const isRaven = inputs.selectedCyberdeckId === 'raven-mk5';
+
+           const emptyQueues = nextQueues.filter(q => q.id !== spreadEvent.sourceQueueId && q.items.length === 0);
+
+           if (emptyQueues.length > 0) {
+              if (isRaven) {
+                 // Spread to all up to limit
+                 const queuesToInfect = emptyQueues.slice(0, spreadLimit);
+                 for (const targetQ of queuesToInfect) {
+                    targetQ.items.push({
+                       ...spreadEvent.item,
+                       id: crypto.randomUUID(),
+                       remainingUploadTime: sourceHack.uploadTime,
+                       completed: false,
+                       cost: 0
+                    });
+                    queuesChanged = true;
+                 }
+              } else {
+                 // Spread to one
+                 emptyQueues[0].items.push({
+                    ...spreadEvent.item,
+                    id: crypto.randomUUID(),
+                    remainingUploadTime: sourceHack.uploadTime,
+                    completed: false,
+                    cost: 0
+                 });
+                 queuesChanged = true;
+              }
+           }
+        }
+
+        // Auto create queue logic
+        // We auto-create if no queues exist, OR if autoCreateQueues is ON and the active queue just locked.
+        const activeQueue = nextQueues.find(q => q.id === activeQueueId);
+        let shouldAutoCreate = nextQueues.length === 0;
+
+        if (inputs.autoCreateQueues && activeQueue && activeQueue.locked) {
+           // check if there's already an empty unlocked queue we could switch to?
+           // No, user requested: "A new queue should be auto created with that toggle if an old one locks or if the enemy is neutralized."
+           const hasEmpty = nextQueues.some(q => q.items.length === 0);
+           if (!hasEmpty) {
+               shouldAutoCreate = true;
+           }
+        }
+
+        if (shouldAutoCreate) {
+           const emptyQueue: import('./types').HackQueue = { id: crypto.randomUUID(), items: [], locked: false };
            setActiveQueueId(emptyQueue.id);
-           return [emptyQueue];
+           nextQueues.push(emptyQueue);
+           queuesChanged = true;
+        } else if (!activeQueue && nextQueues.length > 0) {
+           // Active queue was killed, pick another or create one if autoCreate is on
+           if (inputs.autoCreateQueues) {
+               const emptyQueue: import('./types').HackQueue = { id: crypto.randomUUID(), items: [], locked: false };
+               setActiveQueueId(emptyQueue.id);
+               nextQueues.push(emptyQueue);
+               queuesChanged = true;
+           } else {
+               setActiveQueueId(nextQueues[0].id);
+           }
         }
 
         return queuesChanged || nextQueues.length !== prevQueues.length ? nextQueues : prevQueues;
@@ -163,7 +260,7 @@ function App() {
     }, tickRateMs);
 
     return () => clearInterval(interval);
-  }, [inputs.maxRam, inputs.regenRate, inputs.uploadReduction, inputs.ramOnKill, perks]);
+  }, [inputs, perks, activeQueueId]);
 
   return (
     <div className="min-h-screen p-8 flex flex-col gap-8">
@@ -184,7 +281,7 @@ function App() {
                         const deck = CYBERDECKS.find(d => d.id === val);
                         setInputs({...inputs, selectedCyberdeckId: val, maxRam: deck ? deck.maxRam : inputs.maxRam})
                     }}>
-              {CYBERDECKS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {CYBERDECKS.map(d => <option key={d.id} value={d.id} disabled={d.id === 'canto-mk6'}>{d.name}</option>)}
             </select>
           </label>
           <label className="flex justify-between items-center">
@@ -202,6 +299,15 @@ function App() {
           <label className="flex justify-between items-center">
             <span>Upload Speed Factor (% faster):</span>
             <input type="number" className="w-20 bg-slate-800 border border-sky-700 text-sky-300 p-1" value={inputs.uploadReduction} onChange={e => setInputs({...inputs, uploadReduction: Number(e.target.value)})} />
+          </label>
+          <label className="flex justify-between items-center text-amber-300">
+            <span>Time Slowdown (%):</span>
+            <input type="range" min="0" max="100" className="w-32 accent-amber-500" value={inputs.timeSlowdown} onChange={e => setInputs({...inputs, timeSlowdown: Number(e.target.value)})} />
+            <span className="w-10 text-right">{inputs.timeSlowdown}%</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer mt-2 text-sky-300">
+            <input type="checkbox" checked={inputs.autoCreateQueues} onChange={e => setInputs({...inputs, autoCreateQueues: e.target.checked})} className="accent-sky-500" />
+            Auto-create Queues on Lock/Kill
           </label>
 
           <h2 className="text-xl font-bold text-sky-400 mt-4 border-t border-sky-800 pt-4">Perks</h2>
