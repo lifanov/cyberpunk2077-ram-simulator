@@ -20,9 +20,12 @@ function DraggableHack({ hack }: { hack: Quickhack }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`bg-slate-800 border ${isDragging ? 'border-sky-300 opacity-50' : 'border-slate-600'} p-2 text-sm rounded cursor-grab hover:border-sky-500 hover:bg-slate-700 transition-colors`}
+      className={`bg-slate-800 border ${isDragging ? 'border-sky-300 opacity-50' : 'border-slate-600'} p-2 text-sm rounded cursor-grab hover:border-sky-500 hover:bg-slate-700 transition-colors touch-none`}
     >
-      <div className="font-bold">{hack.name} <span className="text-xs text-yellow-500 ml-1">T{hack.tier}</span></div>
+      <div className="flex justify-between items-start">
+        <div className="font-bold">{hack.name}</div>
+        <div className="text-xs text-sky-400">{hack.category}</div>
+      </div>
       <div className="text-xs text-slate-400 flex justify-between mt-1">
         <span>{hack.baseCost} RAM</span>
         <span>{hack.uploadTime}s</span>
@@ -62,6 +65,7 @@ function DroppableSlot({ index, slot, removeHack }: { index: number, slot: Quick
 
 export function Cyberdeck({ cyberdeck, setCyberdeck }: CyberdeckProps) {
   const [activeHack, setActiveHack] = useState<Quickhack | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string>('1');
 
   const removeHack = (index: number) => {
     const newDeck = [...cyberdeck];
@@ -69,13 +73,11 @@ export function Cyberdeck({ cyberdeck, setCyberdeck }: CyberdeckProps) {
     setCyberdeck(newDeck);
   };
 
-  const groupedHacks = QUICKHACKS.reduce((acc, hack) => {
-    if (!acc[hack.category]) acc[hack.category] = [];
-    acc[hack.category].push(hack);
-    return acc;
-  }, {} as Record<string, Quickhack[]>);
+  const filteredHacks = QUICKHACKS
+    .filter(hack => hack.tier.toString() === selectedTier)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-    const sensors = useSensors(
+  const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 5,
@@ -121,15 +123,28 @@ export function Cyberdeck({ cyberdeck, setCyberdeck }: CyberdeckProps) {
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col gap-6 w-full">
         <div className="border border-sky-800 p-4 rounded bg-slate-900/50">
-          <h2 className="text-xl font-bold text-sky-400 mb-4">Quickhack Library</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-sky-400">Quickhack Library</h2>
+            <div className="flex items-center gap-2">
+              <label htmlFor="tier-select" className="text-sky-300">Tier:</label>
+              <select
+                id="tier-select"
+                value={selectedTier}
+                onChange={(e) => setSelectedTier(e.target.value)}
+                className="bg-slate-800 border border-sky-700 text-sky-300 p-1 rounded"
+              >
+                <option value="1">Tier 1</option>
+                <option value="2">Tier 2</option>
+                <option value="3">Tier 3</option>
+                <option value="4">Tier 4</option>
+                <option value="5">Tier 5</option>
+                <option value="Iconic">Iconic</option>
+              </select>
+            </div>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-            {Object.entries(groupedHacks).map(([category, hacks]) => (
-              <div key={category} className="flex flex-col gap-2">
-                <h3 className="text-sky-300 font-semibold border-b border-sky-800 pb-1">{category}</h3>
-                {hacks.map(hack => (
-                  <DraggableHack key={hack.id} hack={hack} />
-                ))}
-              </div>
+            {filteredHacks.map(hack => (
+              <DraggableHack key={hack.id} hack={hack} />
             ))}
           </div>
         </div>
