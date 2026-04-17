@@ -8,6 +8,7 @@ export interface QueueItem {
   remainingUploadTime: number;
   cost: number;
   completed: boolean;
+  activeDuration: number; // Duration remaining after upload
 }
 
 export interface HackQueue {
@@ -33,4 +34,6 @@ export interface InputState {
   ramOnKill: number;
   uploadReduction: number; // Percentage, 0-100
   selectedCyberdeckId: string;
+  timeSlowdown: number; // 0 to 100 percentage
+  autoCreateQueues: boolean;
 }

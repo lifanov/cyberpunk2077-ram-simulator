@@ -1,52 +1,53 @@
 const fs = require('fs');
 
-let queueFile = fs.readFileSync('src/components/QueueSystem.tsx', 'utf8');
+const qsPath = 'src/components/QueueSystem.tsx';
+let qsData = fs.readFileSync(qsPath, 'utf8');
 
-// We need to pass the selected cyberdeck to QueueSystem so it can calculate costs
-queueFile = queueFile.replace('import type { HackQueue, PerkState, Quickhack, QueueItem } from \'../types\';',
-`import type { HackQueue, PerkState, Quickhack, QueueItem, InputState } from '../types';
-import { CYBERDECKS } from '../data/cyberdecks';`);
+// Also update the queue length check for cost calculation to only check uncompleted items.
+// const isFourthSlot = queue.items.length === 3;
+qsData = qsData.replace(
+  'const isFourthSlot = queue.items.length === 3;',
+  'const isFourthSlot = queue.items.filter(it => !it.completed).length === 3;'
+);
 
-queueFile = queueFile.replace('perks: PerkState;\n}', `perks: PerkState;
-  inputs: InputState;
-}`);
+qsData = qsData.replace(
+  'locked: newItems.length >= 4,',
+  'locked: newItems.filter(it => !it.completed).length >= 4,'
+);
 
-queueFile = queueFile.replace('export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId, cyberdeck, currentRAM, setCurrentRAM, perks }: QueueSystemProps) {',
-`export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId, cyberdeck, currentRAM, setCurrentRAM, perks, inputs }: QueueSystemProps) {`);
+// Add disabled class for Canto and Blackwall
+const renderHack = `          {cyberdeck.map((hack, idx) => {
+            if (!hack) {
+              return <div key={idx} className="h-20 border border-slate-700 rounded bg-slate-900 flex items-center justify-center text-slate-700">Empty</div>;
+            }
 
-queueFile = queueFile.replace('const calculateCost = (hack: Quickhack, isFourthSlot: boolean) => {',
-`const calculateCost = (hack: Quickhack, isFourthSlot: boolean) => {
-    let cost = hack.baseCost;
+            const activeQueue = queues.find(q => q.id === activeQueueId);
+            const isFourthSlot = activeQueue ? activeQueue.items.filter(it => !it.completed).length === 3 : false;
+            const currentCost = calculateCost(hack, isFourthSlot);
+            const canAfford = currentRAM >= currentCost;
 
-    // Apply Cyberdeck modifiers
-    const activeDeck = CYBERDECKS.find(d => d.id === inputs.selectedCyberdeckId);
-    if (activeDeck && activeDeck.bonus.covertRamDiscount && hack.category === 'Covert') {
-        cost = Math.max(1, cost - activeDeck.bonus.covertRamDiscount);
-    }
-`);
+            const isUnimplemented = hack.name === 'Blackwall Gateway';
 
-queueFile = queueFile.replace('if (isFourthSlot && perks.queueMastery) {',
-`if (isFourthSlot && perks.queueMastery) {
-      return Math.max(1, Math.floor(cost / 2));
-    }
-    return cost;
-`);
+            return (
+              <button
+                key={idx}
+                onClick={() => handleAddHackToQueue(hack)}
+                disabled={!canAfford || (activeQueue && activeQueue.locked) || isUnimplemented}
+                className={\`h-20 flex flex-col items-center justify-center p-2 rounded transition-colors \${
+                  isUnimplemented ? 'bg-red-900/10 border-red-900/50 text-slate-600 cursor-not-allowed' :
+                  !canAfford ? 'bg-red-900/20 border-red-900 text-slate-500 cursor-not-allowed' :
+                  'bg-sky-900/40 border border-sky-600 hover:bg-sky-800 cursor-pointer'
+                }\`}
+              >
+                <span className="font-bold text-sm text-sky-200 leading-tight">{hack.name} <span className="text-xs text-yellow-500">T{hack.tier}</span></span>
+                <span className={\`text-xs mt-1 \${isUnimplemented ? 'text-red-500' : isFourthSlot && perks.queueMastery ? 'text-green-400 font-bold' : 'text-sky-400'}\`}>
+                  {isUnimplemented ? 'UNIMPLEMENTED' : \`Cost: \${currentCost} RAM\`}
+                </span>
+              </button>
+            )
+          })}`;
 
-queueFile = queueFile.replace('return hack.baseCost;', '');
+qsData = qsData.replace(/\{cyberdeck\.map\(\(hack, idx\) => \{[\s\S]*?\}\)\}/, renderHack);
 
-// Fix Upload Time reduction in App.tsx
-let appFile = fs.readFileSync('src/App.tsx', 'utf8');
-
-appFile = appFile.replace('const uploadSpeedMultiplier = 1 + (inputs.uploadReduction / 100);',
-`const activeDeck = CYBERDECKS.find(d => d.id === inputs.selectedCyberdeckId);
-
-        let uploadSpeedMultiplier = 1 + (inputs.uploadReduction / 100);
-        // Instead of modifying upload time globally here, cyberdeck modifiers are usually specific to quickhack types.
-        // Wait, netwatch reduces *time*, not increases *speed* for combat hacks.
-        // If the hack is combat and netwatch is selected, time remaining reduces faster, or total time is halved when added.
-        // Since time is tracked per item, reducing time remaining when added is better, or applying it during the tick.
-        `);
-
-fs.writeFileSync('src/components/QueueSystem.tsx', queueFile);
-fs.writeFileSync('src/App.tsx', appFile);
-console.log('patched QueueSystem.tsx and App.tsx');
+fs.writeFileSync(qsPath, qsData);
+console.log('Patched queue');

@@ -53,7 +53,7 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
       return;
     }
 
-    const isFourthSlot = queue.items.length === 3;
+    const isFourthSlot = queue.items.filter(it => !it.completed).length === 3;
     const cost = calculateCost(hack, isFourthSlot);
 
     if (currentRAM < cost) {
@@ -76,6 +76,7 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
       remainingUploadTime: uploadTime,
       cost,
       completed: false,
+      activeDuration: hack.duration,
     };
 
     const newQueues = [...queues];
@@ -83,7 +84,7 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
     newQueues[activeQueueIndex] = {
       ...queue,
       items: newItems,
-      locked: newItems.length >= 4,
+      locked: newItems.filter(it => !it.completed).length >= 4,
     };
 
     setQueues(newQueues);
@@ -111,21 +112,42 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
               <input type="radio" name="activeQueue" className="accent-sky-500" checked={activeQueueId === q.id} onChange={() => setActiveQueueId(q.id)} />
               Q{i + 1}
             </label>
-            <div className="flex flex-1 gap-2 border-l border-sky-800 pl-4">
-              {[0, 1, 2, 3].map(slotIndex => {
-                const item = q.items[slotIndex];
-                if (!item) {
-                  return <div key={slotIndex} className="w-1/4 h-16 border border-dashed border-sky-900 rounded bg-slate-900 flex items-center justify-center text-sky-900">Empty</div>;
-                }
-                const progress = item.completed ? 100 : Math.max(0, 100 - (item.remainingUploadTime / item.quickhack.uploadTime) * 100);
-                return (
-                  <div key={item.id} className="w-1/4 h-16 border border-sky-600 rounded relative overflow-hidden bg-slate-800 flex flex-col items-center justify-center p-1">
-                    <div className="absolute top-0 left-0 h-full bg-cyan-700/50 z-0 transition-all duration-100 ease-linear" style={{ width: `${progress}%` }}></div>
-                    <span className="relative z-10 text-xs font-bold text-sky-200 text-center leading-tight">{item.quickhack.name}</span>
-                    <span className="relative z-10 text-[10px] text-yellow-500">T{item.quickhack.tier} • {item.cost}R</span>
-                  </div>
-                );
-              })}
+            <div className="flex flex-1 gap-2 border-l border-sky-800 pl-4 overflow-x-auto">
+              <div className="flex gap-2 min-w-max border-r border-sky-900 pr-4 relative mt-4">
+                <span className="text-xs text-sky-500 absolute -top-5 left-0 bg-slate-900 px-1">Uploading</span>
+                {[0, 1, 2, 3].map(slotIndex => {
+                  const uploadingItems = q.items.filter(it => !it.completed);
+                  const item = uploadingItems[slotIndex];
+                  if (!item) {
+                    return <div key={slotIndex} className="w-16 h-16 shrink-0 border border-dashed border-sky-900 rounded bg-slate-900 flex items-center justify-center text-sky-900 text-xs">Empty</div>;
+                  }
+                  const progress = item.completed ? 100 : Math.max(0, 100 - (item.remainingUploadTime / item.quickhack.uploadTime) * 100);
+                  return (
+                    <div key={item.id} className="w-16 h-16 shrink-0 border border-sky-600 rounded relative overflow-hidden bg-slate-800 flex flex-col items-center justify-center p-1">
+                      <div className="absolute top-0 left-0 h-full bg-cyan-700/50 z-0 transition-all duration-100 ease-linear" style={{ width: `${progress}%` }}></div>
+                      <span className="relative z-10 text-[10px] font-bold text-sky-200 text-center leading-tight">{item.quickhack.name}</span>
+                      <span className="relative z-10 text-[9px] text-yellow-500">T{item.quickhack.tier} • {item.cost}R</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2 min-w-max relative mt-4">
+                <span className="text-xs text-emerald-500 absolute -top-5 left-0 bg-slate-900 px-1">Active Effects</span>
+                {q.items.filter(it => it.completed && it.activeDuration > 0).map(item => {
+                  const progress = Math.max(0, (item.activeDuration / item.quickhack.duration) * 100);
+                  return (
+                    <div key={item.id} className="w-16 h-16 shrink-0 border border-emerald-600 rounded relative overflow-hidden bg-slate-800 flex flex-col items-center justify-center p-1 opacity-80">
+                      <div className="absolute top-0 left-0 h-full bg-emerald-900/50 z-0 transition-all duration-100 ease-linear" style={{ width: `${progress}%` }}></div>
+                      <span className="relative z-10 text-[10px] font-bold text-emerald-200 text-center leading-tight">{item.quickhack.name}</span>
+                      <span className="relative z-10 text-[9px] text-emerald-400">{item.activeDuration.toFixed(1)}s</span>
+                    </div>
+                  );
+                })}
+                {q.items.filter(it => it.completed && it.activeDuration > 0).length === 0 && (
+                   <div className="text-xs text-slate-600 flex items-center px-2">No active effects</div>
+                )}
+              </div>
             </div>
             {q.locked && <div className="text-red-500 text-sm font-bold uppercase tracking-widest px-2">LOCKED</div>}
           </div>
@@ -135,28 +157,33 @@ export function QueueSystem({ queues, setQueues, activeQueueId, setActiveQueueId
       <div className="mt-4 pt-4 border-t border-sky-800">
         <h3 className="text-lg font-bold text-sky-400 mb-4">Execute Quickhack (to Active Queue)</h3>
         <div className="grid grid-cols-4 gap-4">
-          {cyberdeck.map((hack, idx) => {
+                    {cyberdeck.map((hack, idx) => {
             if (!hack) {
               return <div key={idx} className="h-20 border border-slate-700 rounded bg-slate-900 flex items-center justify-center text-slate-700">Empty</div>;
             }
 
             const activeQueue = queues.find(q => q.id === activeQueueId);
-            const isFourthSlot = activeQueue ? activeQueue.items.length === 3 : false;
+            const isFourthSlot = activeQueue ? activeQueue.items.filter(it => !it.completed).length === 3 : false;
             const currentCost = calculateCost(hack, isFourthSlot);
             const canAfford = currentRAM >= currentCost;
+
+            const isUnimplemented = hack.name === 'Blackwall Gateway';
 
             return (
               <button
                 key={idx}
                 onClick={() => handleAddHackToQueue(hack)}
-                disabled={!canAfford || (activeQueue && activeQueue.locked)}
+                disabled={!canAfford || (activeQueue && activeQueue.locked) || isUnimplemented}
                 className={`h-20 flex flex-col items-center justify-center p-2 rounded transition-colors ${
+                  isUnimplemented ? 'bg-red-900/10 border-red-900/50 text-slate-600 cursor-not-allowed' :
                   !canAfford ? 'bg-red-900/20 border-red-900 text-slate-500 cursor-not-allowed' :
                   'bg-sky-900/40 border border-sky-600 hover:bg-sky-800 cursor-pointer'
                 }`}
               >
                 <span className="font-bold text-sm text-sky-200 leading-tight">{hack.name} <span className="text-xs text-yellow-500">T{hack.tier}</span></span>
-                <span className={`text-xs mt-1 ${isFourthSlot && perks.queueMastery ? 'text-green-400 font-bold' : 'text-sky-400'}`}>Cost: {currentCost} RAM</span>
+                <span className={`text-xs mt-1 ${isUnimplemented ? 'text-red-500' : isFourthSlot && perks.queueMastery ? 'text-green-400 font-bold' : 'text-sky-400'}`}>
+                  {isUnimplemented ? 'UNIMPLEMENTED' : `Cost: ${currentCost} RAM`}
+                </span>
               </button>
             )
           })}
