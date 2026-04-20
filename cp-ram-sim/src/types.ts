@@ -36,4 +36,6 @@ export interface InputState {
   selectedCyberdeckId: string;
   timeSlowdown: number; // 0 to 100 percentage
   autoCreateQueues: boolean;
+  cyberware: "none" | "camillo" | "reallocator";
+  intelligence: number;
 }

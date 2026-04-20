@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import type { InputState, PerkState, HackQueue, Quickhack, QueueItem } from './types';
 import { CYBERDECKS } from './data/cyberdecks';
@@ -15,7 +15,11 @@ function App() {
     selectedCyberdeckId: 'none',
     timeSlowdown: 0,
     autoCreateQueues: false,
+    cyberware: 'none',
+    intelligence: 20,
   });
+
+  const [cyberwareCooldownRemaining, setCyberwareCooldownRemaining] = useState<number>(0);
 
   const [perks, setPerks] = useState<PerkState>({
     optimization: false,
@@ -31,6 +35,17 @@ function App() {
   const [queues, setQueues] = useState<HackQueue[]>([]);
   const [activeQueueId, setActiveQueueId] = useState<string | null>(null);
 
+  const ramRef = useRef(currentRAM);
+  const cdRef = useRef(cyberwareCooldownRemaining);
+
+  useEffect(() => {
+    ramRef.current = currentRAM;
+  }, [currentRAM]);
+
+  useEffect(() => {
+    cdRef.current = cyberwareCooldownRemaining;
+  }, [cyberwareCooldownRemaining]);
+
   // Simulation Loop
   useEffect(() => {
     const tickRateMs = 50; // 50ms per tick
@@ -38,14 +53,42 @@ function App() {
       const timeScalar = 1 - (inputs.timeSlowdown / 100);
       if (timeScalar <= 0) return; // Completely paused
 
+      // Cyberware check uses refs to avoid closures and interval resetting
+      let triggerHealAmount = 0;
+      let newCooldownVal = Math.max(0, cdRef.current - (tickRateMs / 1000) * timeScalar);
+
+      if (inputs.cyberware !== 'none' && newCooldownVal === 0) {
+        const threshold = inputs.maxRam * 0.20;
+        if (ramRef.current <= threshold) {
+          if (inputs.cyberware === 'reallocator') {
+            triggerHealAmount = inputs.maxRam * 0.45;
+            if (ramRef.current < inputs.maxRam * 0.10) {
+              newCooldownVal = Math.max(0, 85 - (inputs.intelligence * 3));
+            }
+          } else if (inputs.cyberware === 'camillo') {
+            triggerHealAmount = inputs.maxRam * 0.23;
+            if (ramRef.current < inputs.maxRam * 0.10) {
+              newCooldownVal = Math.max(0, 80 - (inputs.intelligence * 2));
+            }
+          }
+        }
+      }
+
+      // 0. Update Cooldowns (only if it actually changed to avoid unnecessary renders)
+      if (newCooldownVal !== cdRef.current) {
+         setCyberwareCooldownRemaining(newCooldownVal);
+      }
+
       // 1. Regenerate RAM
-      setCurrentRAM(prev => {
+      setCurrentRAM(prevRAM => {
+        const nextRAM = prevRAM + triggerHealAmount;
+
         let baseRegen = inputs.regenRate;
         if (perks.optimization) {
           baseRegen += inputs.regenRate * 0.1;
         }
         const regenAmount = baseRegen * (tickRateMs / 1000) * timeScalar;
-        return Math.min(inputs.maxRam, prev + regenAmount);
+        return Math.min(inputs.maxRam, nextRAM + regenAmount);
       });
 
       // 2. Process Queues and handle Kills/Drains
@@ -260,7 +303,7 @@ function App() {
     }, tickRateMs);
 
     return () => clearInterval(interval);
-  }, [inputs, perks, activeQueueId]);
+  }, [inputs, perks, activeQueueId, currentRAM, cyberwareCooldownRemaining]);
 
   return (
     <div className="min-h-screen p-8 flex flex-col gap-8">
@@ -337,15 +380,37 @@ function App() {
                 checked={perks.queuePrioritization} onChange={e => setPerks({...perks, queuePrioritization: e.target.checked})} />
               <span className="group-hover:text-sky-300">Queue Prioritization (+50% speed 1st if 2+ queued)</span>
             </label>
+
+          <h2 className="text-xl font-bold text-sky-400 mt-4 border-t border-sky-800 pt-4">Cyberware</h2>
+          <label className="flex justify-between items-center">
+            <span>Cyberware:</span>
+            <select className="w-48 bg-slate-800 border border-sky-700 text-sky-300 p-1"
+                    value={inputs.cyberware}
+                    onChange={e => setInputs({...inputs, cyberware: e.target.value as InputState['cyberware']})}>
+              <option value="none">None</option>
+              <option value="camillo">Camillo RAM Manager</option>
+              <option value="reallocator">RAM Reallocator</option>
+            </select>
+          </label>
+          <label className="flex justify-between items-center">
+            <span>Intelligence:</span>
+            <input type="number" min="3" max="20" className="w-20 bg-slate-800 border border-sky-700 text-sky-300 p-1" value={inputs.intelligence} onChange={e => setInputs({...inputs, intelligence: Number(e.target.value)})} />
+          </label>
+          <div className="flex justify-between items-center text-sm text-sky-200 mt-2">
+            <span>Cyberware Cooldown:</span>
+            <span>{cyberwareCooldownRemaining.toFixed(1)}s</span>
+          </div>
         </div>
 
         <div className="col-span-2 flex flex-col gap-4 border border-sky-800 p-4 rounded bg-slate-900">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-sky-400">Current RAM</h2>
-            <div className="text-3xl font-mono text-cyan-400">{Math.floor(currentRAM)} / {inputs.maxRam}</div>
-          </div>
-          <div className="w-full bg-slate-800 h-6 rounded overflow-hidden border border-sky-900 relative mb-4">
-            <div className="h-full bg-cyan-600 transition-all duration-100 ease-linear" style={{ width: `${Math.min(100, Math.max(0, (currentRAM / inputs.maxRam) * 100))}%` }}></div>
+          <div className="sticky top-0 z-20 bg-slate-900 p-4 border-b-2 border-sky-600 shadow-md shadow-slate-900/50 -mx-4 -mt-4 mb-0 rounded-t">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-sky-400">Current RAM</h2>
+              <div className="text-3xl font-mono text-cyan-400">{Math.floor(currentRAM)} / {inputs.maxRam}</div>
+            </div>
+            <div className="w-full bg-slate-800 h-6 rounded overflow-hidden border border-sky-900 relative mt-2">
+              <div className="h-full bg-cyan-600 transition-all duration-100 ease-linear" style={{ width: `${Math.min(100, Math.max(0, (currentRAM / inputs.maxRam) * 100))}%` }}></div>
+            </div>
           </div>
 
           <Cyberdeck cyberdeck={cyberdeck} setCyberdeck={setCyberdeck} />
